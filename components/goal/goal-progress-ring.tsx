@@ -69,7 +69,7 @@ export function GoalProgressRing({
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
-          className="text-blue-500"
+          className="text-blue-500 dark:text-blue-400"
           style={{
             strokeDasharray,
             strokeDashoffset,

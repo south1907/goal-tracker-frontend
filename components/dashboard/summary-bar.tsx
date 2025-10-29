@@ -3,19 +3,25 @@
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Goal as ApiGoal } from '@/lib/types/api';
-import { LogEntry } from '@/types/goal';
 import { Target, TrendingUp, Trophy, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SummaryBarProps {
   goals: ApiGoal[];
-  logs: LogEntry[];
+  totalLogs?: number;
 }
 
-export function SummaryBar({ goals, logs }: SummaryBarProps) {
+export function SummaryBar({ goals, totalLogs = 0 }: SummaryBarProps) {
   const activeGoals = goals.filter(goal => goal.status === 'active');
-  const completedGoals = goals.filter(goal => goal.status === 'ended');
-  const totalLogs = logs.length;
+  
+  // Completed: goals with progress >= 100% (achieved)
+  const completedGoals = goals.filter(goal => {
+    const isGoalWithStats = 'progress_pct' in goal;
+    if (isGoalWithStats) {
+      return (goal as any).achieved === true; // progress >= 100%
+    }
+    return false;
+  });
   
   const stats = [
     {

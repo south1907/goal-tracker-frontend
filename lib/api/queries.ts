@@ -57,6 +57,14 @@ export function useGoalLogsQuery(goalId: number, filters?: LogFilters & Paginati
   });
 }
 
+export function useAllLogsQuery(filters?: LogFilters & PaginationParams) {
+  return useQuery({
+    queryKey: ['logs', 'all', filters],
+    queryFn: () => apiClient.getAllLogs(filters),
+    enabled: apiClient.isAuthenticated(),
+  });
+}
+
 // Progress queries
 export function useGoalProgressQuery(goalId: number, window?: string, tz?: string) {
   return useQuery({

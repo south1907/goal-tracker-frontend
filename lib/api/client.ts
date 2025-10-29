@@ -11,6 +11,7 @@ import type {
   ErrorDetail,
   PaginatedResponse,
   Goal,
+  GoalWithStats,
   GoalCreate,
   GoalUpdate,
   Log,
@@ -244,7 +245,7 @@ class ApiClient {
   }
 
   // Goal methods
-  async getGoals(filters?: GoalFilters & PaginationParams): Promise<PaginatedResponse<Goal>> {
+  async getGoals(filters?: GoalFilters & PaginationParams & { include_stats?: boolean }): Promise<PaginatedResponse<GoalWithStats | Goal>> {
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
@@ -254,7 +255,7 @@ class ApiClient {
       });
     }
     const query = params.toString();
-    return this.get<PaginatedResponse<Goal>>(`/goals${query ? `?${query}` : ''}`);
+    return this.get<PaginatedResponse<Goal | GoalWithStats>>(`/goals${query ? `?${query}` : ''}`);
   }
 
   async getGoal(goalId: number): Promise<Goal> {
@@ -291,6 +292,19 @@ class ApiClient {
   }
 
   // Log methods
+  async getAllLogs(filters?: LogFilters & PaginationParams): Promise<PaginatedResponse<Log>> {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+    }
+    const query = params.toString();
+    return this.get<PaginatedResponse<Log>>(`/logs/all${query ? `?${query}` : ''}`);
+  }
+
   async getGoalLogs(goalId: number, filters?: LogFilters & PaginationParams): Promise<PaginatedResponse<Log>> {
     const params = new URLSearchParams();
     if (filters) {

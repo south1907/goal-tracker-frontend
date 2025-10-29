@@ -69,6 +69,15 @@ export interface Goal {
   updated_at: string;
 }
 
+export interface GoalWithStats extends Goal {
+  progress_pct: number;
+  achieved: boolean;
+  achieved_value: number;
+  required_pace: number;
+  actual_pace: number;
+  streak: StreakData;
+}
+
 export interface GoalCreate {
   name: string;
   description?: string;

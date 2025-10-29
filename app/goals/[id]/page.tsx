@@ -82,20 +82,34 @@ function adaptApiGoalToComponentGoal(apiGoal: ApiGoal): ComponentGoal {
 export default function EnhancedGoalDetail() {
   const params = useParams();
   const router = useRouter();
-  const goalId = parseInt(params.id as string);
-  
   const { isAuthenticated } = useAuthStore();
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  // Parse goalId and validate - use useMemo to ensure it updates when params change
+  const { goalId, isValidGoalId } = useMemo(() => {
+    const goalIdParam = params?.id as string;
+    const id = goalIdParam ? parseInt(goalIdParam, 10) : 0;
+    const isValid = !isNaN(id) && id > 0;
+    return { goalId: id, isValidGoalId: isValid };
+  }, [params?.id]);
   
   // Handle hydration
   useEffect(() => {
     setIsHydrated(true);
   }, []);
   
-  // API queries
-  const { data: goal, isLoading: goalLoading, error: goalError } = useGoalQuery(goalId);
-  const { data: logsData, isLoading: logsLoading } = useGoalLogsQuery(goalId);
-  const { data: progressData, isLoading: progressLoading } = useGoalProgressQuery(goalId);
+  // API queries - only enable if goalId is valid and after hydration
+  const { data: goal, isLoading: goalLoading, error: goalError } = useGoalQuery(
+    isValidGoalId && isHydrated ? goalId : 0
+  );
+  const { data: logsData, isLoading: logsLoading } = useGoalLogsQuery(
+    isValidGoalId && isHydrated ? goalId : 0
+  );
+  const { data: progressData, isLoading: progressLoading } = useGoalProgressQuery(
+    isValidGoalId && isHydrated ? goalId : 0, 
+    'last_30d', 
+    'Asia/Bangkok'
+  );
   
   // Mutations
   const deleteGoalMutation = useDeleteGoalMutation(goalId);
@@ -118,13 +132,39 @@ export default function EnhancedGoalDetail() {
   );
   
   // Redirect if not authenticated (only after hydration)
-  if (isHydrated && !isAuthenticated) {
-    router.push('/login');
-    return null;
+  useEffect(() => {
+    if (isHydrated && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isHydrated, isAuthenticated, router]);
+  
+  // Show error if goalId is invalid
+  if (isHydrated && !isValidGoalId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+            <Target className="h-12 w-12 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Invalid Goal ID
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            The goal ID in the URL is invalid.
+          </p>
+          <Link href="/">
+            <Button variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
   
-  // Show loading while hydrating
-  if (!isHydrated) {
+  // Show loading while hydrating or if not authenticated
+  if (!isHydrated || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950">
         <div className="max-w-6xl mx-auto px-4 py-8">
@@ -170,7 +210,7 @@ export default function EnhancedGoalDetail() {
   }
   
   // Error state
-  if (goalError || !goal) {
+  if (isHydrated && (goalError || (!goalLoading && !goal))) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-4">

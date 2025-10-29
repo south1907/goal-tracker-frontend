@@ -25,6 +25,10 @@
   --input: 226 232 240; /* slate-200 */
   --ring: 14 165 233; /* sky-500 */
   
+  /* Card Colors */
+  --card: 255 255 255;
+  --card-foreground: 15 23 42; /* slate-900 */
+  
   /* Glass Effect */
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(255, 255, 255, 0.2);
@@ -58,6 +62,10 @@
   --color-input: rgb(var(--input));
   --color-ring: rgb(var(--ring));
   
+  /* Card Colors */
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+  
   /* Glass Effect */
   --color-glass-bg: var(--glass-bg);
   --color-glass-border: var(--glass-border);
@@ -80,24 +88,34 @@
   --shadow-glass: var(--glass-shadow);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    
-    /* Dark mode adjustments */
-    --secondary: 30 41 59; /* slate-800 */
-    --secondary-foreground: 248 250 252; /* slate-50 */
-    --muted: 15 23 42; /* slate-900 */
-    --muted-foreground: 148 163 184; /* slate-400 */
-    --border: 51 65 85; /* slate-700 */
-    --input: 51 65 85; /* slate-700 */
-    
-    /* Glass Effect Dark */
-    --glass-bg: rgba(15, 23, 42, 0.8);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-  }
+/* Dark mode - using class selector for better control */
+.dark {
+  --background: #0f172a; /* slate-900 - richer dark background */
+  --foreground: #f1f5f9; /* slate-100 - softer, more readable text */
+  
+  /* Enhanced Primary Colors for Dark Mode */
+  --primary: 56 189 248; /* sky-400 - brighter for dark mode */
+  --primary-foreground: 30 58 138; /* blue-900 - darker text on bright bg */
+  --accent: 20 184 166; /* teal-500 - vibrant accent */
+  --accent-foreground: 17 94 89; /* teal-900 */
+  
+  /* Dark mode adjustments with better contrast */
+  --secondary: 30 41 59; /* slate-800 */
+  --secondary-foreground: 226 232 240; /* slate-200 - brighter text */
+  --muted: 30 41 59; /* slate-800 - less dark than before */
+  --muted-foreground: 148 163 184; /* slate-400 - good contrast */
+  --border: 51 65 85; /* slate-700 */
+  --input: 71 85 105; /* slate-600 - slightly lighter for better visibility */
+  --ring: 56 189 248; /* sky-400 - brighter ring for dark mode */
+  
+  /* Enhanced Card Colors Dark */
+  --card: 30 41 59; /* slate-800 - lighter cards with depth */
+  --card-foreground: 226 232 240; /* slate-200 - excellent readability */
+  
+  /* Enhanced Glass Effect Dark */
+  --glass-bg: rgba(30, 41, 59, 0.85); /* slate-800 with better opacity */
+  --glass-border: rgba(148, 163, 184, 0.2); /* slate-400 - more visible border */
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6); /* deeper shadow */
 }
 
 body {
@@ -116,6 +134,12 @@ body {
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
 }
 
+.dark .glass {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
@@ -123,6 +147,12 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
   border-radius: 1rem;
+}
+
+.dark .glass-card {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(148, 163, 184, 0.05);
 }
 
 /* Enhanced animations */
@@ -160,4 +190,13 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--muted-foreground) / 0.5);
+}
+
+/* Enhanced dark mode scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
 }

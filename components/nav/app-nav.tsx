@@ -24,7 +24,6 @@ import { useAuthStore } from '@/lib/api/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Goals', href: '/goals', icon: Target },
   { name: 'Stats', href: '/stats', icon: BarChart3 },
   { name: 'Profile', href: '/profile', icon: User },
 ];

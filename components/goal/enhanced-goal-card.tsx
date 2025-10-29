@@ -6,8 +6,9 @@ import { Goal } from '@/types/goal';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { calculateProgress, calculatePace, computeStreak, getDaysRemaining } from '@/lib/utils/calculations';
-import { useGoalsStore } from '@/lib/state/use-goals';
+import { getDaysRemaining } from '@/lib/utils/calculations';
+import { useGoalProgressQuery } from '@/lib/api/queries';
+import { ProgressStats } from '@/lib/types/api';
 import { TrendingUp, TrendingDown, Clock, Target, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,19 +16,62 @@ interface EnhancedGoalCardProps {
   goal: Goal;
   onClick?: () => void;
   index?: number;
+  progressStats?: ProgressStats; // Optional: progress stats from parent
 }
 
-export function EnhancedGoalCard({ goal, onClick, index = 0 }: EnhancedGoalCardProps) {
-  const logs = useGoalsStore((state) => state.logs);
-  
-  const goalLogs = useMemo(() => 
-    logs.filter((log) => log.goalId === goal.id),
-    [logs, goal.id]
+export function EnhancedGoalCard({ goal, onClick, index = 0, progressStats: propProgressStats }: EnhancedGoalCardProps) {
+  // Only fetch progress stats if not provided as prop (for backward compatibility)
+  const numericGoalId = parseInt(goal.id, 10);
+  const shouldFetch = !propProgressStats;
+  const { data: fetchedProgressStats } = useGoalProgressQuery(
+    shouldFetch ? numericGoalId : 0, 
+    'last_30d', 
+    'Asia/Bangkok'
   );
   
-  const progress = calculateProgress(goal, goalLogs);
-  const pace = calculatePace(goal, goalLogs);
-  const streak = computeStreak(goal, goalLogs);
+  // Use prop stats if available, otherwise use fetched stats
+  const progressStats = propProgressStats || fetchedProgressStats;
+  
+  // Use API progress data or fallback to calculated values
+  const progress = useMemo(() => {
+    if (progressStats) {
+      return {
+        percentage: progressStats.progress_pct / 100, // Convert to 0-1 range
+        current: Number(progressStats.achieved_value),
+        target: Number(progressStats.target),
+        remaining: Math.max(Number(progressStats.target) - Number(progressStats.achieved_value), 0),
+      };
+    }
+    // Fallback when data is loading
+    return {
+      percentage: 0,
+      current: 0,
+      target: goal.target,
+      remaining: goal.target,
+    };
+  }, [progressStats, goal.target]);
+  
+  const pace = useMemo(() => {
+    if (progressStats) {
+      return {
+        delta: progressStats.actual_pace - progressStats.required_pace,
+        current: progressStats.actual_pace,
+        required: progressStats.required_pace,
+      };
+    }
+    return { delta: 0, current: 0, required: 0 };
+  }, [progressStats]);
+  
+  const streak = useMemo(() => {
+    if (progressStats?.streak) {
+      return {
+        current: progressStats.streak.current || 0,
+        longest: progressStats.streak.best || 0,
+      };
+    }
+    return { current: 0, longest: 0 };
+  }, [progressStats]);
+  
   const daysRemaining = getDaysRemaining(goal);
   
   const progressPercentage = Math.round(progress.percentage * 100);

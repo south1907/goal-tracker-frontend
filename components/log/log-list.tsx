@@ -109,7 +109,7 @@ export function LogList({ goalId, logs }: LogListProps) {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
           >
-            <Card className="hover:shadow-soft transition-shadow duration-200">
+            <Card className="hover:shadow-soft transition-shadow duration-200 bg-card dark:bg-gray-900/50 border-border">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

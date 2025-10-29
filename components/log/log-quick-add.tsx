@@ -42,7 +42,7 @@ export function LogQuickAdd({ goalId, defaultValue = 1, onSubmit }: LogQuickAddP
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      className="bg-white dark:bg-gray-900 rounded-2xl shadow-medium border border-gray-200 dark:border-gray-700 p-4"
+      className="bg-white dark:bg-gray-900/80 backdrop-blur-sm rounded-2xl shadow-medium border border-gray-200 dark:border-gray-700 p-4"
     >
       <div className="flex items-center gap-3 min-w-0">
         {/* Value Controls */}
@@ -78,7 +78,7 @@ export function LogQuickAdd({ goalId, defaultValue = 1, onSubmit }: LogQuickAddP
         <Button
           onClick={handleSubmit}
           disabled={addLogMutation.isPending}
-          className="flex-1 min-w-0 bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 min-w-0 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white whitespace-nowrap px-3 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
           <span className="truncate">{addLogMutation.isPending ? 'Logging...' : 'Log'}</span>

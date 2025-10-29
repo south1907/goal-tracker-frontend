@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useGoalsQuery } from '@/lib/api/queries';
+import { useGoalsQuery, useStatsOverviewQuery } from '@/lib/api/queries';
 import { useAuthStore } from '@/lib/api/auth';
 import { EnhancedGoalCard } from '@/components/goal/enhanced-goal-card';
 import { SummaryBar } from '@/components/dashboard/summary-bar';
@@ -14,18 +14,18 @@ import {
   Search, 
   Target, 
   CheckCircle, 
-  Clock, 
   Plus,
   Grid3X3,
   List,
-  LogIn
+  LogIn,
+  CalendarX
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import type { GoalFilters, Goal as ApiGoal } from '@/lib/types/api';
+import type { GoalFilters, Goal as ApiGoal, GoalWithStats, ProgressStats } from '@/lib/types/api';
 import type { Goal as ComponentGoal } from '@/types/goal';
 
-type FilterType = 'all' | 'active' | 'completed' | 'expired';
+type FilterType = 'all' | 'completed' | 'ended';
 type ViewType = 'grid' | 'list';
 
 // Adapter function to convert API goal to component goal
@@ -63,29 +63,132 @@ function adaptApiGoalToComponentGoal(apiGoal: ApiGoal): ComponentGoal {
 
 export function EnhancedDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [viewType, setViewType] = useState<ViewType>('grid');
   
   const { isAuthenticated, user } = useAuthStore();
   
-  // Build filters for API query
-  const apiFilters: GoalFilters = {
-    ...(filter !== 'all' && { status: filter as any }),
-    ...(searchTerm && { q: searchTerm }),
-  };
+  // Debounce search term to avoid searching on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // Wait 500ms after user stops typing
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   
+  // Build filters for API query
+  // Note: completed needs client-side filtering since it's based on progress, not status
+  const apiFilters: GoalFilters & { include_stats?: boolean } = useMemo(() => ({
+    ...(filter === 'ended' && { status: 'ended' }),
+    // For 'completed' and 'all', fetch all goals to filter client-side
+    ...(debouncedSearchTerm && debouncedSearchTerm.trim() && { q: debouncedSearchTerm.trim() }),
+    include_stats: true, // Include progress stats in response (needed for completed filter)
+  }), [filter, debouncedSearchTerm]);
+  
+  // Query for filtered goals (for display) with progress stats
   const { data: goalsData, isLoading, error } = useGoalsQuery(apiFilters);
   
-  const apiGoals = goalsData?.items || [];
-  const goals = apiGoals.map(adaptApiGoalToComponentGoal);
+  // Query for all goals (for summary stats) - no filters but include stats
+  const { data: allGoalsData } = useGoalsQuery({ include_stats: true } as any);
   
-  const activeGoals = goals.filter((goal: ComponentGoal) => goal.status === 'active');
-  const completedGoals = goals.filter((goal: ComponentGoal) => goal.status === 'ended');
+  // Query for stats overview (includes total logs)
+  const { data: statsData } = useStatsOverviewQuery();
+  
+  // Calculate total logs from stats
+  const totalLogs = useMemo(() => {
+    return statsData?.total_logs ?? 0;
+  }, [statsData]);
+  
+  const apiGoals = goalsData?.items || [];
+  
+  // Filter goals client-side for 'completed' and 'ended' since they have special logic
+  const filteredApiGoals = useMemo(() => {
+    if (filter === 'completed') {
+      // Filter by progress >= 100% (achieved)
+      return apiGoals.filter((goal: ApiGoal | GoalWithStats) => {
+        const isGoalWithStats = 'progress_pct' in goal;
+        if (isGoalWithStats) {
+          const goalWithStats = goal as GoalWithStats;
+          return goalWithStats.achieved; // progress >= 100%
+        }
+        return false;
+      });
+    }
+    if (filter === 'ended') {
+      // Filter: status is 'ended' AND not completed (progress < 100%)
+      return apiGoals.filter((goal: ApiGoal | GoalWithStats) => {
+        if (goal.status !== 'ended') return false;
+        const isGoalWithStats = 'progress_pct' in goal;
+        if (isGoalWithStats) {
+          const goalWithStats = goal as GoalWithStats;
+          return !goalWithStats.achieved; // Not completed (progress < 100%)
+        }
+        return true; // If no stats, assume not completed
+      });
+    }
+    // For 'all' filter, use API filtered results
+    return apiGoals;
+  }, [apiGoals, filter]);
+  
+  const goals = filteredApiGoals.map(adaptApiGoalToComponentGoal);
+  
+  // Extract progress stats from GoalWithStats if available
+  const goalsWithStats = useMemo(() => {
+    return filteredApiGoals.map((goal) => {
+      const isGoalWithStats = 'progress_pct' in goal;
+      if (isGoalWithStats) {
+        const goalWithStats = goal as GoalWithStats;
+        return {
+          goal,
+          progressStats: {
+            progress_pct: goalWithStats.progress_pct,
+            achieved: goalWithStats.achieved,
+            achieved_value: goalWithStats.achieved_value,
+            target: goalWithStats.target || 0,
+            unit: goalWithStats.unit,
+            required_pace: goalWithStats.required_pace,
+            actual_pace: goalWithStats.actual_pace,
+            streak: goalWithStats.streak,
+          } as ProgressStats,
+        };
+      }
+      return { goal, progressStats: undefined };
+    });
+  }, [apiGoals]);
+  
+  // Use all goals for counts, filtered goals for display
+  const allApiGoals = allGoalsData?.items || [];
+  const allGoalsWithStats = useMemo(() => {
+    return allApiGoals.map((goal) => {
+      const isGoalWithStats = 'progress_pct' in goal;
+      if (isGoalWithStats) {
+        return goal as GoalWithStats;
+      }
+      return null;
+    }).filter(Boolean) as GoalWithStats[];
+  }, [allApiGoals]);
+  
+  // Calculate completed goals (progress >= 100%)
+  const completedGoals = useMemo(() => {
+    return allGoalsWithStats.filter((goal: GoalWithStats) => goal.achieved);
+  }, [allGoalsWithStats]);
+  
+  // Calculate ended goals (status = 'ended' and not completed)
+  const endedGoals = useMemo(() => {
+    return allApiGoals.filter((goal: ApiGoal) => {
+      // Status is ended AND not completed (progress < 100%)
+      if (goal.status !== 'ended') return false;
+      const goalWithStats = allGoalsWithStats.find(g => g.id === goal.id);
+      return !goalWithStats || !goalWithStats.achieved;
+    });
+  }, [allApiGoals, allGoalsWithStats]);
   
   const filterTabs = [
-    { id: 'all' as FilterType, label: 'All Goals', icon: Target, count: goals.length },
-    { id: 'active' as FilterType, label: 'Active', icon: Clock, count: activeGoals.length },
+    { id: 'all' as FilterType, label: 'All Goals', icon: Target, count: allApiGoals.length },
     { id: 'completed' as FilterType, label: 'Completed', icon: CheckCircle, count: completedGoals.length },
+    { id: 'ended' as FilterType, label: 'Ended', icon: CalendarX, count: endedGoals.length },
   ];
   
   // Show login prompt if not authenticated
@@ -224,43 +327,41 @@ export function EnhancedDashboard() {
                   onClick={() => setFilter(tab.id)}
                   className={cn(
                     'relative px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200',
-                    'flex items-center gap-2',
-                    isActive 
-                      ? 'text-white bg-gradient-to-r from-sky-500 to-teal-500 shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-gray-800/50'
+                    'flex items-center gap-2 overflow-hidden',
+                    !isActive && 'text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-gray-800/50'
                   )}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
+                  {isActive && (
+                    <motion.div
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 z-0"
+                      layoutId="activeTab"
+                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                  
+                  <Icon className={cn('h-4 w-4 relative z-10', isActive ? 'text-white' : '')} />
+                  <span className={cn('relative z-10', isActive ? 'text-white font-semibold' : '')}>{tab.label}</span>
                   <Badge 
                     variant="secondary" 
                     className={cn(
-                      'ml-1 text-xs',
+                      'ml-1 text-xs relative z-10',
                       isActive 
-                        ? 'bg-white/20 text-white' 
+                        ? 'bg-white/30 text-white border-white/40' 
                         : 'bg-muted text-muted-foreground'
                     )}
                   >
                     {tab.count}
                   </Badge>
-                  
-                  {isActive && (
-                    <motion.div
-                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500"
-                      layoutId="activeTab"
-                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                    />
-                  )}
                 </motion.button>
               );
             })}
           </div>
         </motion.div>
         
-        {/* Summary Bar */}
-        <SummaryBar goals={apiGoals} logs={[]} />
+        {/* Summary Bar - use all goals for accurate totals */}
+        <SummaryBar goals={allApiGoals} totalLogs={totalLogs} />
         
         {/* Goals Grid */}
         <motion.div
@@ -304,14 +405,18 @@ export function EnhancedDashboard() {
                 : 'grid-cols-1'
             )}>
               <AnimatePresence mode="popLayout">
-                {goals.map((goal: ComponentGoal, index: number) => (
-                  <EnhancedGoalCard
-                    key={goal.id}
-                    goal={goal}
-                    index={index}
-                    onClick={() => window.location.href = `/goals/${goal.id}`}
-                  />
-                ))}
+                {goals.map((goal: ComponentGoal, index: number) => {
+                  const goalWithStats = goalsWithStats.find((g: { goal: ApiGoal; progressStats?: ProgressStats }) => g.goal.id.toString() === goal.id);
+                  return (
+                    <EnhancedGoalCard
+                      key={goal.id}
+                      goal={goal}
+                      index={index}
+                      progressStats={goalWithStats?.progressStats}
+                      onClick={() => window.location.href = `/goals/${goal.id}`}
+                    />
+                  );
+                })}
               </AnimatePresence>
             </div>
           )}

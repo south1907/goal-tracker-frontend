@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useGoalsStore } from '@/lib/state/use-goals';
-import { Goal, LogEntry } from '@/types/goal';
+import { useGoalsQuery, useStatsOverviewQuery, useAllLogsQuery } from '@/lib/api/queries';
+import { useAuthStore } from '@/lib/api/auth';
+import { Goal as ApiGoal, GoalWithStats, Log as ApiLog } from '@/lib/types/api';
+import { Goal as ComponentGoal, LogEntry as ComponentLogEntry } from '@/types/goal';
 import { 
   calculateProgress, 
   calculatePace, 
-  computeStreak, 
-  getGoalStatus 
+  computeStreak 
 } from '@/lib/utils/calculations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartProgress } from '@/components/charts/chart-progress';
-import { HeatmapCalendar } from '@/components/charts/heatmap-calendar';
+import { OverallActivityChart } from '@/components/charts/overall-activity-chart';
+import { EnhancedHeatmapCalendar } from '@/components/charts/enhanced-heatmap-calendar';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -20,51 +21,224 @@ import {
   Target, 
   Calendar,
   Clock,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
+
+// Adapter functions
+function adaptApiGoalToComponentGoal(apiGoal: ApiGoal | GoalWithStats): ComponentGoal {
+  return {
+    id: apiGoal.id.toString(),
+    name: apiGoal.name,
+    description: apiGoal.description,
+    emoji: apiGoal.emoji,
+    type: apiGoal.goal_type,
+    unit: apiGoal.unit,
+    target: apiGoal.target || 0,
+    timeframe: {
+      type: apiGoal.timeframe_type,
+      start: apiGoal.start_at,
+      end: apiGoal.end_at,
+      rollingDays: apiGoal.rolling_days,
+      rrule: apiGoal.rrule,
+    },
+    privacy: apiGoal.privacy,
+    status: apiGoal.status,
+    settings: {
+      milestones: apiGoal.settings_json?.milestones?.map((m: any) => ({
+        label: m.label,
+        threshold: m.threshold,
+      })),
+      unitPerSession: apiGoal.settings_json?.unitPerSession,
+      streakRule: apiGoal.settings_json?.streakRule as "daily" | "x_per_week" | undefined,
+      xPerWeek: apiGoal.settings_json?.xPerWeek,
+    },
+    createdAt: apiGoal.created_at,
+    updatedAt: apiGoal.updated_at,
+  };
+}
+
+function adaptApiLogToComponentLogEntry(apiLog: ApiLog): ComponentLogEntry {
+  return {
+    id: apiLog.id.toString(),
+    goalId: apiLog.goal_id.toString(),
+    date: apiLog.date,
+    value: apiLog.value,
+    note: apiLog.note,
+    attachmentUrl: apiLog.attachment_url,
+  };
+}
 
 export default function Stats() {
-  const { goals, logs } = useGoalsStore();
+  const { isAuthenticated } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   
-  const activeGoals = goals.filter(goal => getGoalStatus(goal, logs) === 'active');
-  const completedGoals = goals.filter(goal => getGoalStatus(goal, logs) === 'completed');
-  
-  // Calculate overall stats
-  const totalLogs = logs.length;
-  const totalValue = logs.reduce((sum, log) => sum + log.value, 0);
-  const averagePerDay = totalLogs > 0 ? totalValue / 30 : 0; // Rough estimate
-  
-  // Find best performing goals
-  const goalStats = goals.map(goal => {
-    const goalLogs = logs.filter(log => log.goalId === goal.id);
-    const progress = calculateProgress(goal, goalLogs);
-    const pace = calculatePace(goal, goalLogs);
-    const streak = computeStreak(goal, goalLogs);
-    
-    return {
-      goal,
-      progress: progress.percentage,
-      pace: pace.actual,
-      streak: streak.best,
-      logs: goalLogs.length
-    };
+  // Fetch real data from API
+  const { data: statsData, isLoading: statsLoading } = useStatsOverviewQuery();
+  const { data: goalsData, isLoading: goalsLoading } = useGoalsQuery({ 
+    include_stats: true 
+  } as any);
+  const { data: allLogsData, isLoading: logsLoading } = useAllLogsQuery({ 
+    page_size: 10000 // Get all logs for visualization
   });
   
-  const bestProgressGoal = goalStats.reduce((best, current) => 
-    current.progress > best.progress ? current : best, goalStats[0] || { progress: 0 });
+  const isLoading = statsLoading || goalsLoading || logsLoading;
   
-  const longestStreakGoal = goalStats.reduce((best, current) => 
-    current.streak > best.streak ? current : best, goalStats[0] || { streak: 0 });
+  // Convert API goals to component format
+  const goals = useMemo(() => {
+    if (!goalsData?.items) return [];
+    return goalsData.items.map(adaptApiGoalToComponentGoal);
+  }, [goalsData]);
   
-  const mostActiveGoal = goalStats.reduce((best, current) => 
-    current.logs > best.logs ? current : best, goalStats[0] || { logs: 0 });
+  // Collect all logs from goals with stats (we'll need to fetch logs separately or use aggregated data)
+  // For now, we'll calculate stats from GoalWithStats data
+  const goalStats = useMemo(() => {
+    if (!goalsData?.items) return [];
+    
+    return goalsData.items.map((apiGoal: ApiGoal | GoalWithStats) => {
+      const isGoalWithStats = 'progress_pct' in apiGoal;
+      const goal = adaptApiGoalToComponentGoal(apiGoal);
+      
+      if (isGoalWithStats) {
+        const goalWithStats = apiGoal as GoalWithStats;
+        return {
+          goal,
+          progress: goalWithStats.progress_pct / 100, // Convert to 0-1 range
+          pace: goalWithStats.actual_pace,
+          streak: goalWithStats.streak?.best || 0,
+          currentStreak: goalWithStats.streak?.current || 0,
+          logs: 0, // We don't have log count in GoalWithStats, will need separate query
+        };
+      }
+      return {
+        goal,
+        progress: 0,
+        pace: 0,
+        streak: 0,
+        currentStreak: 0,
+        logs: 0,
+      };
+    });
+  }, [goalsData]);
   
-  // Calculate completion rate by period
-  const completionRate = goals.length > 0 ? (completedGoals.length / goals.length) * 100 : 0;
+  // Calculate stats from API data
+  const activeGoals = useMemo(() => {
+    return goals.filter(goal => goal.status === 'active');
+  }, [goals]);
+  
+  const completedGoals = useMemo(() => {
+    return goalStats.filter(stat => stat.progress >= 1);
+  }, [goalStats]);
+  
+  // Use stats from API
+  const totalLogs = statsData?.total_logs || 0;
+  const completionRate = statsData?.completion_rate || 0;
+  
+  // Calculate average per day (approximate)
+  const daysSinceStart = useMemo(() => {
+    if (!goals.length) return 30;
+    const oldestGoal = goals.reduce((oldest, goal) => {
+      const goalDate = new Date(goal.timeframe.start);
+      const oldestDate = new Date(oldest.timeframe.start);
+      return goalDate < oldestDate ? goal : oldest;
+    });
+    const start = new Date(oldestGoal.timeframe.start);
+    const now = new Date();
+    return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  }, [goals]);
+  
+  const averagePerDay = daysSinceStart > 0 ? totalLogs / daysSinceStart : 0;
+  
+  // Find best performing goals from goalStats
+  const bestProgressGoal = useMemo(() => {
+    return goalStats.reduce((best, current) => 
+      current.progress > best.progress ? current : best, 
+      goalStats[0] || { goal: null, progress: 0, pace: 0, streak: 0, currentStreak: 0, logs: 0 }
+    );
+  }, [goalStats]);
+  
+  const longestStreakGoal = useMemo(() => {
+    return goalStats.reduce((best, current) => 
+      current.streak > best.streak ? current : best, 
+      goalStats[0] || { goal: null, progress: 0, pace: 0, streak: 0, currentStreak: 0, logs: 0 }
+    );
+  }, [goalStats]);
+  
+  // For most active, we'll use the goal with highest actual pace
+  const mostActiveGoal = useMemo(() => {
+    return goalStats.reduce((best, current) => 
+      current.pace > best.pace ? current : best, 
+      goalStats[0] || { goal: null, progress: 0, pace: 0, streak: 0, currentStreak: 0, logs: 0 }
+    );
+  }, [goalStats]);
+  
+  // Format best day and week from stats
+  const bestDayFormatted = useMemo(() => {
+    if (!statsData?.best_day) return null;
+    const date = new Date(statsData.best_day);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }, [statsData]);
+  
+  const bestWeekFormatted = useMemo(() => {
+    if (!statsData?.best_week) return null;
+    const date = new Date(statsData.best_week);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }, [statsData]);
+  
+  // Convert all logs to component format for charts
+  const allLogs = useMemo(() => {
+    if (!allLogsData?.items) return [];
+    return allLogsData.items.map(adaptApiLogToComponentLogEntry);
+  }, [allLogsData]);
+  
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading statistics...</p>
+        </motion.div>
+      </div>
+    );
+  }
+  
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md mx-auto px-4"
+        >
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-r from-sky-100 to-teal-100 dark:from-sky-900 dark:to-teal-900 flex items-center justify-center">
+            <Target className="h-12 w-12 text-sky-500" />
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            Please log in
+          </h3>
+          <p className="text-muted-foreground mb-6">
+            You need to be logged in to view statistics
+          </p>
+          <Link href="/login">
+            <button className="bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-600 hover:to-teal-600 text-white px-6 py-2 rounded-lg font-medium">
+              Log In
+            </button>
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -94,11 +268,12 @@ export default function Stats() {
               <button
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={cn(
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                   selectedPeriod === period
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
+                    ? 'bg-gradient-to-r from-sky-500 to-teal-500 text-white shadow-md'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                )}
               >
                 {period.charAt(0).toUpperCase() + period.slice(1)}
               </button>
@@ -121,7 +296,7 @@ export default function Stats() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {goals.length}
+                    {statsData?.total_goals || goals.length}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">Total Goals</div>
                 </div>
@@ -194,18 +369,24 @@ export default function Stats() {
             </CardHeader>
             <CardContent>
               {bestProgressGoal.goal ? (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{bestProgressGoal.goal.emoji}</span>
-                    <span className="font-medium">{bestProgressGoal.goal.name}</span>
+                <Link 
+                  href={`/goals/${bestProgressGoal.goal.id}`} 
+                  className="block hover:opacity-80 transition-opacity"
+                  prefetch={true}
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{bestProgressGoal.goal.emoji}</span>
+                      <span className="font-medium">{bestProgressGoal.goal.name}</span>
+                    </div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {Math.round(bestProgressGoal.progress * 100)}%
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {bestProgressGoal.goal.unit}
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {Math.round(bestProgressGoal.progress * 100)}%
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {bestProgressGoal.logs} logs
-                  </div>
-                </div>
+                </Link>
               ) : (
                 <div className="text-gray-500 dark:text-gray-400">No data available</div>
               )}
@@ -220,21 +401,29 @@ export default function Stats() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {longestStreakGoal.goal ? (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{longestStreakGoal.goal.emoji}</span>
-                    <span className="font-medium">{longestStreakGoal.goal.name}</span>
+              {longestStreakGoal.goal && longestStreakGoal.streak > 0 ? (
+                <Link 
+                  href={`/goals/${longestStreakGoal.goal.id}`} 
+                  className="block hover:opacity-80 transition-opacity"
+                  prefetch={true}
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{longestStreakGoal.goal.emoji}</span>
+                      <span className="font-medium">{longestStreakGoal.goal.name}</span>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {longestStreakGoal.streak} days
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Best streak • Current: {longestStreakGoal.currentStreak} days
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {longestStreakGoal.streak} days
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Best streak
-                  </div>
-                </div>
+                </Link>
               ) : (
-                <div className="text-gray-500 dark:text-gray-400">No data available</div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  {statsData?.longest_streak ? `${statsData.longest_streak} days across all goals` : 'No streak data'}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -247,21 +436,27 @@ export default function Stats() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {mostActiveGoal.goal ? (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{mostActiveGoal.goal.emoji}</span>
-                    <span className="font-medium">{mostActiveGoal.goal.name}</span>
+              {mostActiveGoal.goal && mostActiveGoal.pace > 0 ? (
+                <Link 
+                  href={`/goals/${mostActiveGoal.goal.id}`} 
+                  className="block hover:opacity-80 transition-opacity"
+                  prefetch={true}
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{mostActiveGoal.goal.emoji}</span>
+                      <span className="font-medium">{mostActiveGoal.goal.name}</span>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      {mostActiveGoal.pace.toFixed(1)}/day
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Highest pace • {mostActiveGoal.goal.unit}
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {mostActiveGoal.logs} logs
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Most logged
-                  </div>
-                </div>
+                </Link>
               ) : (
-                <div className="text-gray-500 dark:text-gray-400">No data available</div>
+                <div className="text-gray-500 dark:text-gray-400">No active goals yet</div>
               )}
             </CardContent>
           </Card>
@@ -279,12 +474,7 @@ export default function Stats() {
                 <CardTitle className="text-lg">Overall Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                  <div className="text-center">
-                    <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Activity chart coming soon</p>
-                  </div>
-                </div>
+                <OverallActivityChart logs={allLogs} period={selectedPeriod} type="area" />
               </CardContent>
             </Card>
           </motion.div>
@@ -296,10 +486,27 @@ export default function Stats() {
           >
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Activity Heatmap</CardTitle>
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span>Activity Heatmap</span>
+                  {(bestDayFormatted || bestWeekFormatted) && (
+                    <div className="text-xs text-muted-foreground font-normal">
+                      {bestDayFormatted && `Best day: ${bestDayFormatted}`}
+                      {bestDayFormatted && bestWeekFormatted && ' • '}
+                      {bestWeekFormatted && `Best week: ${bestWeekFormatted}`}
+                    </div>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <HeatmapCalendar logs={logs} />
+                {allLogs.length > 0 ? (
+                  <EnhancedHeatmapCalendar logs={allLogs} />
+                ) : (
+                  <div className="text-gray-500 dark:text-gray-400 text-center py-8">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No activity data yet</p>
+                    <p className="text-sm mt-2">Start logging to see your activity heatmap!</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -322,40 +529,62 @@ export default function Stats() {
                     <tr className="border-b border-gray-200 dark:border-gray-700">
                       <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Goal</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Progress</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Logs</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Streak</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {goalStats.map((stat) => (
-                      <tr key={stat.goal.id} className="border-b border-gray-100 dark:border-gray-800">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <span>{stat.goal.emoji}</span>
-                            <span className="font-medium">{stat.goal.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                            {Math.round(stat.progress * 100)}%
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-gray-600 dark:text-gray-400">
-                            {stat.logs}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            stat.progress >= 1 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                          }`}>
-                            {stat.progress >= 1 ? 'Completed' : 'Active'}
-                          </span>
+                    {goalStats.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                          No goals yet. Create your first goal to see statistics!
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      goalStats.map((stat) => (
+                        <tr 
+                          key={stat.goal.id} 
+                          className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                          onClick={() => window.location.href = `/goals/${stat.goal.id}`}
+                        >
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <span>{stat.goal.emoji}</span>
+                              <span className="font-medium">{stat.goal.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                              {Math.round(stat.progress * 100)}%
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {stat.pace > 0 ? `${stat.pace.toFixed(1)}/day` : ''}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-gray-600 dark:text-gray-400">
+                              {stat.streak > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <Zap className="h-3 w-3" />
+                                  <span>{stat.streak} days</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              stat.progress >= 1 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : stat.goal.status === 'ended'
+                                ? 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            }`}>
+                              {stat.progress >= 1 ? 'Completed' : stat.goal.status === 'ended' ? 'Ended' : 'Active'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
