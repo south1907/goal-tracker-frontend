@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGoalsQuery, useStatsOverviewQuery, useAllLogsQuery } from '@/lib/api/queries';
 import { useAuthStore } from '@/lib/api/auth';
@@ -74,17 +74,23 @@ function adaptApiLogToComponentLogEntry(apiLog: ApiLog): ComponentLogEntry {
 export default function Stats() {
   const { isAuthenticated } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
+  const [isHydrated, setIsHydrated] = useState(false);
   
-  // Fetch real data from API
+  // Handle hydration
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+  
+  // Fetch real data from API - only enable after hydration
   const { data: statsData, isLoading: statsLoading } = useStatsOverviewQuery();
-  const { data: goalsData, isLoading: goalsLoading } = useGoalsQuery({ 
-    include_stats: true 
-  } as any);
-  const { data: allLogsData, isLoading: logsLoading } = useAllLogsQuery({ 
-    page_size: 10000 // Get all logs for visualization
-  });
+  const { data: goalsData, isLoading: goalsLoading } = useGoalsQuery(
+    isHydrated ? { include_stats: true } as any : undefined
+  );
+  const { data: allLogsData, isLoading: logsLoading } = useAllLogsQuery(
+    isHydrated ? { page_size: 10000 } : undefined
+  );
   
-  const isLoading = statsLoading || goalsLoading || logsLoading;
+  const isLoading = !isHydrated || statsLoading || goalsLoading || logsLoading;
   
   // Convert API goals to component format
   const goals = useMemo(() => {
@@ -193,23 +199,19 @@ export default function Stats() {
     return allLogsData.items.map(adaptApiLogToComponentLogEntry);
   }, [allLogsData]);
   
-  // Show loading state
-  if (isLoading) {
+  // Show loading state (including while hydrating)
+  if (!isHydrated || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center"
-        >
+        <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
           <p className="text-muted-foreground">Loading statistics...</p>
-        </motion.div>
+        </div>
       </div>
     );
   }
   
-  // Show login prompt if not authenticated
+  // Show login prompt if not authenticated (only after hydration)
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
@@ -369,24 +371,18 @@ export default function Stats() {
             </CardHeader>
             <CardContent>
               {bestProgressGoal.goal ? (
-                <Link 
-                  href={`/goals/${bestProgressGoal.goal.id}`} 
-                  className="block hover:opacity-80 transition-opacity"
-                  prefetch={true}
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">{bestProgressGoal.goal.emoji}</span>
-                      <span className="font-medium">{bestProgressGoal.goal.name}</span>
-                    </div>
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {Math.round(bestProgressGoal.progress * 100)}%
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {bestProgressGoal.goal.unit}
-                    </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">{bestProgressGoal.goal.emoji}</span>
+                    <span className="font-medium">{bestProgressGoal.goal.name}</span>
                   </div>
-                </Link>
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {Math.round(bestProgressGoal.progress * 100)}%
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {bestProgressGoal.goal.unit}
+                  </div>
+                </div>
               ) : (
                 <div className="text-gray-500 dark:text-gray-400">No data available</div>
               )}
