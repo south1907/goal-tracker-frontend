@@ -34,9 +34,9 @@ export function AppNav() {
   const { user, isAuthenticated, logout } = useAuthStore();
   
   return (
-    <>
+    <div className="w-full">
       {/* Desktop Navigation */}
-      <nav className="hidden md:flex items-center justify-between px-6 py-4 glass-card border-0">
+      <nav className="hidden md:flex items-center justify-between px-6 py-4 glass-card border-0 min-h-[4rem] flex-shrink-0">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <motion.div 
@@ -107,7 +107,7 @@ export function AppNav() {
       </nav>
       
       {/* Mobile Navigation */}
-      <nav className="md:hidden flex items-center justify-between px-4 py-3 glass-card border-0">
+      <nav className="md:hidden flex items-center justify-between px-4 py-3 glass-card border-0 min-h-[3.5rem] flex-shrink-0">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-7 h-7 bg-gradient-to-br from-sky-500 to-teal-500 rounded-lg flex items-center justify-center">
             <Trophy className="h-4 w-4 text-white" />
@@ -141,7 +141,7 @@ export function AppNav() {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-64 glass-card border-0">
+            <SheetContent side="right" className="w-64 glass-card border-0 max-h-screen overflow-y-auto">
               <div className="flex flex-col gap-4 mt-8">
                 {navigation.map((item) => {
                   const isActive = pathname === item.href;
@@ -202,6 +202,6 @@ export function AppNav() {
           </Link>
         </div>
       </div>
-    </>
+    </div>
   );
 }

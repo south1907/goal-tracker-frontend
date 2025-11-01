@@ -27,6 +27,12 @@ cd "$PROJECT_DIR" || {
     exit 1
 }
 
+echo -e "${YELLOW}📥 Pulling latest code from git...${NC}"
+git pull || {
+    echo -e "${RED}Error: Failed to pull latest code${NC}"
+    exit 1
+}
+
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 npm install --production || {
     echo -e "${RED}Error: Failed to install dependencies${NC}"

@@ -34,7 +34,7 @@ export default function RootLayout({
         <QueryProvider>
           <AppNav />
           <PageTransition>
-            <main className="pb-20 md:pb-0">
+            <main className="pb-20 md:pb-0 pt-0">
               {children}
             </main>
           </PageTransition>
