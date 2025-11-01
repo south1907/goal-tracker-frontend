@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,18 @@ interface GoalWizardProps {
 export function GoalWizard({ onComplete, onCancel }: GoalWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const createGoalMutation = useCreateGoalMutation();
+  
+  // Ensure wizard content is visible after mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const element = document.querySelector('[data-goal-wizard-step]') as HTMLElement;
+      if (element && window.getComputedStyle(element).opacity === '0') {
+        element.style.opacity = '1';
+      }
+    }, 500); // Fallback after 500ms
+    
+    return () => clearTimeout(timer);
+  }, [currentStep]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -148,6 +160,14 @@ export function GoalWizard({ onComplete, onCancel }: GoalWizardProps) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
+            onAnimationComplete={() => {
+              // Ensure opacity is 1 after animation completes
+              const element = document.querySelector('[data-goal-wizard-step]') as HTMLElement;
+              if (element) {
+                element.style.opacity = '1';
+              }
+            }}
+            data-goal-wizard-step
           >
             {currentStep === 0 && (
               <div className="space-y-4">
