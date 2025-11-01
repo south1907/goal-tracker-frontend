@@ -19,6 +19,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GoalTracker - Track Your Goals & Habits",
   description: "A modern goal and habit tracker focused on setting goals, logging progress, streaks, milestones, and clear visualizations.",
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.svg',
+  },
 };
 
 export default function RootLayout({
