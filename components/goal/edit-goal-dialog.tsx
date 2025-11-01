@@ -43,7 +43,7 @@ export function EditGoalDialog({ goal, open, onOpenChange }: EditGoalDialogProps
       rollingDays: 30,
       rrule: '',
     },
-    privacy: 'private' as const,
+    privacy: 'private' as 'private' | 'public' | 'unlisted',
     settings: {
       milestones: [
         { label: '25%', threshold: 25 },
@@ -71,7 +71,7 @@ export function EditGoalDialog({ goal, open, onOpenChange }: EditGoalDialogProps
           rollingDays: goal.rolling_days || 30,
           rrule: goal.rrule || '',
         },
-        privacy: goal.privacy || 'private',
+        privacy: (goal.privacy as 'private' | 'public' | 'unlisted') || 'private',
         settings: {
           milestones: goal.settings_json?.milestones || [
             { label: '25%', threshold: 25 },
@@ -99,7 +99,7 @@ export function EditGoalDialog({ goal, open, onOpenChange }: EditGoalDialogProps
     { value: 'milestone', label: 'Milestone', description: 'Track progress milestones', emoji: '🏆' },
   ];
 
-  const units = {
+  const units: Record<Exclude<GoalType, 'open'>, string[]> = {
     count: ['times', 'sessions', 'items', 'books', 'workouts'],
     sum: ['km', 'miles', 'hours', 'minutes', 'pages'],
     streak: ['days', 'weeks', 'months'],
@@ -306,7 +306,7 @@ export function EditGoalDialog({ goal, open, onOpenChange }: EditGoalDialogProps
                       </label>
                       <Tabs value={formData.unit} onValueChange={(value) => updateFormData({ unit: value })}>
                         <TabsList className="grid w-full grid-cols-3">
-                          {units[formData.type]?.map((unit) => (
+                          {formData.type !== 'open' && units[formData.type]?.map((unit) => (
                             <TabsTrigger key={unit} value={unit}>
                               {unit}
                             </TabsTrigger>
