@@ -167,6 +167,12 @@ class ApiClient {
       }
     }
 
+    // Handle 204 No Content (successful delete with no body) - check before reading body
+    if (response.status === 204) {
+      // 204 responses have no body, so we can't read it
+      return {} as T;
+    }
+
     if (!response.ok) {
       let errorDetail: string;
       let fields: Record<string, string[]> | undefined;
@@ -181,14 +187,17 @@ class ApiClient {
 
       throw new ApiError(response.status, errorDetail, fields);
     }
-
-    // Handle empty responses
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return response.json();
-    } else {
-      return {} as T;
+    
+    // Handle JSON responses (only if status is not 204)
+    if (response.status !== 204) {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const text = await response.text();
+        return text ? JSON.parse(text) : ({} as T);
+      }
     }
+    
+    return {} as T;
   }
 
   // HTTP method helpers
@@ -211,7 +220,9 @@ class ApiClient {
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+    const result = await this.request<T>(endpoint, { method: 'DELETE' });
+    // For void return types (like deleteGoal), return undefined
+    return result ?? (undefined as any);
   }
 
   // Auth methods

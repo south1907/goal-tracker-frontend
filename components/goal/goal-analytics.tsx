@@ -10,10 +10,8 @@ import {
   TrendingUp, 
   TrendingDown,
   Calendar,
-  Clock,
   Flame,
   Trophy,
-  Activity,
   BarChart3,
   Zap
 } from 'lucide-react';
@@ -75,12 +73,6 @@ export function GoalAnalytics({ goal, progressData, logs }: GoalAnalyticsProps) 
     };
   }, [logs]);
 
-  // Get recent activity (last 10 logs)
-  const recentActivity = useMemo(() => {
-    return logs
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 10);
-  }, [logs]);
 
   // Calculate milestone progress
   const milestoneProgress = useMemo(() => {
@@ -314,63 +306,6 @@ export function GoalAnalytics({ goal, progressData, logs }: GoalAnalyticsProps) 
           </Card>
         </motion.div>
       )}
-
-      {/* Recent Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        <Card className="glass-card border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-indigo-500" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No activity yet. Start logging your progress!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentActivity.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                        <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
-                          {Number(log.value).toLocaleString()} {goal.unit}
-                        </div>
-                        {log.note && (
-                          <div className="text-sm text-muted-foreground truncate">
-                            {log.note}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0 text-right ml-4">
-                      <div className="text-sm font-medium">
-                        {formatDate(log.date)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatTimeAgo(log.date)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   );
 }

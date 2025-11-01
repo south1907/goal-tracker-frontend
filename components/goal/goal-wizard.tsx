@@ -49,10 +49,10 @@ export function GoalWizard({ onComplete, onCancel }: GoalWizardProps) {
     privacy: 'private' as const,
     settings: {
       milestones: [
-        { label: '25%', threshold: 0.25 },
-        { label: '50%', threshold: 0.5 },
-        { label: '75%', threshold: 0.75 },
-        { label: '100%', threshold: 1 },
+        { label: '25%', threshold: 25 },
+        { label: '50%', threshold: 50 },
+        { label: '75%', threshold: 75 },
+        { label: '100%', threshold: 100 },
       ],
     },
   });

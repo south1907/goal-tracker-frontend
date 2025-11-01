@@ -11,6 +11,7 @@ import { useAuthStore } from '@/lib/api/auth';
 import { EnhancedProgressRing } from '@/components/goal/enhanced-progress-ring';
 import { EnhancedMilestoneChips } from '@/components/goal/enhanced-milestone-chips';
 import { GoalAnalytics } from '@/components/goal/goal-analytics';
+import { EditGoalDialog } from '@/components/goal/edit-goal-dialog';
 import { LogQuickAdd } from '@/components/log/log-quick-add';
 import { LogList } from '@/components/log/log-list';
 import { EnhancedChartProgress } from '@/components/charts/enhanced-chart-progress';
@@ -85,6 +86,7 @@ export default function EnhancedGoalDetail() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Parse goalId and validate - use useMemo to ensure it updates when params change
   const { goalId, isValidGoalId } = useMemo(() => {
@@ -112,9 +114,9 @@ export default function EnhancedGoalDetail() {
     'Asia/Bangkok'
   );
   
-  // Mutations
-  const deleteGoalMutation = useDeleteGoalMutation(goalId);
-  const addLogMutation = useAddLogMutation(goalId);
+  // Mutations - only create if goalId is valid
+  const deleteGoalMutation = useDeleteGoalMutation(isValidGoalId && goalId > 0 ? goalId : 0);
+  const addLogMutation = useAddLogMutation(isValidGoalId && goalId > 0 ? goalId : 0);
   
   const logs = logsData?.items || [];
   
@@ -235,14 +237,38 @@ export default function EnhancedGoalDetail() {
     );
   }
   
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
-      deleteGoalMutation.mutate(undefined, {
-        onSuccess: () => {
-          toast.success('Goal deleted successfully');
-          router.push('/');
-        }
+  const handleDelete = async () => {
+    if (!goal || !isValidGoalId || goalId <= 0) {
+      toast.error('Invalid goal', {
+        description: 'Cannot delete an invalid goal.',
       });
+      return;
+    }
+
+    if (confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
+      try {
+        deleteGoalMutation.mutate(undefined, {
+          onSuccess: () => {
+            console.log('Delete mutation succeeded, navigating...');
+            // Small delay to ensure cache is updated before navigation
+            setTimeout(() => {
+              router.push('/');
+            }, 200);
+          },
+          onError: (error) => {
+            // Error is already handled by the mutation, just log for debugging
+            console.error('Delete goal error in handleDelete:', error);
+          },
+          onSettled: () => {
+            console.log('Delete mutation settled');
+          }
+        });
+      } catch (error) {
+        console.error('Error calling delete mutation:', error);
+        toast.error('Failed to delete goal', {
+          description: 'An unexpected error occurred. Please try again.',
+        });
+      }
     }
   };
   
@@ -313,7 +339,11 @@ export default function EnhancedGoalDetail() {
               <Badge className={getStatusColor(goal.status)}>
                 {goal.status}
               </Badge>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsEditDialogOpen(true)}
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
@@ -521,6 +551,13 @@ export default function EnhancedGoalDetail() {
           </div>
         </div>
       </div>
+      
+      {/* Edit Goal Dialog */}
+      <EditGoalDialog
+        goal={goal}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      />
     </div>
   );
 }

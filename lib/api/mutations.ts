@@ -96,21 +96,57 @@ export function useDeleteGoalMutation(goalId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => apiClient.deleteGoal(goalId),
-    onSuccess: () => {
-      // Remove from cache
-      queryClient.removeQueries({ queryKey: queryKeys.goal(goalId) });
-      
-      // Invalidate goals list
-      queryClient.invalidateQueries({ queryKey: queryKeys.goals });
-      
-      toast.success('Goal deleted successfully!', {
-        description: 'The goal has been removed from your list.',
-      });
+    mutationFn: async () => {
+      if (!goalId || goalId <= 0) {
+        throw new Error('Invalid goal ID');
+      }
+      await apiClient.deleteGoal(goalId);
+      return;
+    },
+    onSuccess: async () => {
+      try {
+        // Remove the specific goal from all caches immediately
+        queryClient.removeQueries({ queryKey: queryKeys.goal(goalId) });
+        queryClient.removeQueries({ queryKey: queryKeys.goalLogs(goalId) });
+        queryClient.removeQueries({ queryKey: queryKeys.goalProgress(goalId) });
+        
+        // Remove goal from goals list cache by updating it
+        queryClient.setQueriesData(
+          { queryKey: queryKeys.goals },
+          (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              items: old.items?.filter((goal: any) => goal.id !== goalId) || [],
+              total: Math.max(0, (old.total || 0) - 1),
+            };
+          }
+        );
+        
+        // Invalidate goals list to ensure server data is fresh
+        await queryClient.invalidateQueries({ queryKey: queryKeys.goals });
+        
+        // Also invalidate stats since deleting a goal affects stats
+        await queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+        
+        toast.success('Goal deleted successfully!', {
+          description: 'The goal has been removed from your list.',
+        });
+      } catch (error) {
+        console.error('Error in delete mutation onSuccess:', error);
+        // Even if cache update fails, show success and invalidate
+        await queryClient.invalidateQueries({ queryKey: queryKeys.goals });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+        toast.success('Goal deleted successfully!', {
+          description: 'The goal has been removed from your list.',
+        });
+      }
     },
     onError: (error) => {
       const message = error instanceof ApiError 
         ? error.detail 
+        : error instanceof Error && error.message === 'Invalid goal ID'
+        ? 'Invalid goal ID. Please refresh the page and try again.'
         : 'Failed to delete goal. Please try again.';
       
       toast.error('Failed to delete goal', {

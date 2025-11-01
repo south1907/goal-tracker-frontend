@@ -53,82 +53,84 @@ export function EnhancedChartProgress({ goal, logs }: EnhancedChartProgressProps
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.6 }}
-      className="h-80"
+      className="w-full"
     >
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData}>
-          <defs>
-            <linearGradient id="progressGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.1}/>
-            </linearGradient>
-            <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#0ea5e9"/>
-              <stop offset="100%" stopColor="#14b8a6"/>
-            </linearGradient>
-          </defs>
-          
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-          
-          <XAxis 
-            dataKey="date" 
-            stroke="#64748b"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-          />
-          
-          <YAxis 
-            stroke="#64748b"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-            domain={[0, goal.target]}
-          />
-          
-          <Tooltip
-            content={({ active, payload, label }) => {
-              if (active && payload && payload.length) {
-                return (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700"
-                  >
-                    <p className="font-medium text-gray-900 dark:text-gray-100">
-                      {label}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-sky-500 to-teal-500"></div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Progress: <span className="font-semibold">{payload[0].value}</span>
+      <div className="h-80 mb-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="progressGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.1}/>
+              </linearGradient>
+              <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#0ea5e9"/>
+                <stop offset="100%" stopColor="#14b8a6"/>
+              </linearGradient>
+            </defs>
+            
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
+            
+            <XAxis 
+              dataKey="date" 
+              stroke="#64748b"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+            />
+            
+            <YAxis 
+              stroke="#64748b"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              domain={[0, goal.target]}
+            />
+            
+            <Tooltip
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {label}
                       </p>
-                    </div>
-                  </motion.div>
-                );
-              }
-              return null;
-            }}
-          />
-          
-          <Area
-            type="monotone"
-            dataKey="cumulative"
-            stroke="url(#lineGradient)"
-            strokeWidth={3}
-            fill="url(#progressGradient)"
-            dot={{ fill: '#0ea5e9', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: '#0ea5e9', strokeWidth: 2, fill: '#fff' }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-sky-500 to-teal-500"></div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Progress: <span className="font-semibold">{payload[0].value}</span>
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                }
+                return null;
+              }}
+            />
+            
+            <Area
+              type="monotone"
+              dataKey="cumulative"
+              stroke="url(#lineGradient)"
+              strokeWidth={3}
+              fill="url(#progressGradient)"
+              dot={{ fill: '#0ea5e9', strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: '#0ea5e9', strokeWidth: 2, fill: '#fff' }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
       
       {/* Trend Indicator */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.3 }}
-        className="flex items-center justify-center gap-2 mt-4"
+        className="flex items-center justify-center gap-2 pt-2"
       >
         {isPositiveTrend ? (
           <TrendingUp className="h-4 w-4 text-green-500" />
