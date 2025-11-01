@@ -10,6 +10,7 @@ import { useDeleteGoalMutation, useAddLogMutation } from '@/lib/api/mutations';
 import { useAuthStore } from '@/lib/api/auth';
 import { EnhancedProgressRing } from '@/components/goal/enhanced-progress-ring';
 import { EnhancedMilestoneChips } from '@/components/goal/enhanced-milestone-chips';
+import { GoalAnalytics } from '@/components/goal/goal-analytics';
 import { LogQuickAdd } from '@/components/log/log-quick-add';
 import { LogList } from '@/components/log/log-list';
 import { EnhancedChartProgress } from '@/components/charts/enhanced-chart-progress';
@@ -274,6 +275,10 @@ export default function EnhancedGoalDetail() {
     }
   };
   
+  if (!goal) {
+    return null; // Should not happen due to earlier checks, but TypeScript needs this
+  }
+
   const GoalTypeIcon = getGoalTypeIcon(goal.goal_type);
   
   return (
@@ -325,6 +330,20 @@ export default function EnhancedGoalDetail() {
           </div>
         </motion.div>
         
+        {/* Analytics Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+          className="mb-8"
+        >
+          <GoalAnalytics
+            goal={goal}
+            progressData={progressData}
+            logs={componentLogs}
+          />
+        </motion.div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -332,7 +351,7 @@ export default function EnhancedGoalDetail() {
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
             >
               <Card className="glass-card border-0">
                 <CardContent className="p-8">
@@ -354,7 +373,7 @@ export default function EnhancedGoalDetail() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
+                transition={{ duration: 0.6, delay: 0.7 }}
               >
                 <Card className="glass-card border-0">
                   <CardHeader>
@@ -377,7 +396,7 @@ export default function EnhancedGoalDetail() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.8 }}
             >
               <Card className="glass-card border-0">
                 <CardHeader>
@@ -399,7 +418,7 @@ export default function EnhancedGoalDetail() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.9 }}
             >
               <Card className="glass-card border-0">
                 <CardHeader>
@@ -423,7 +442,7 @@ export default function EnhancedGoalDetail() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              transition={{ duration: 0.6, delay: 1.0 }}
             >
               <Card className="glass-card border-0">
                 <CardHeader>
@@ -444,7 +463,7 @@ export default function EnhancedGoalDetail() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.6, delay: 1.1 }}
             >
               <Card className="glass-card border-0">
                 <CardHeader>
@@ -482,7 +501,7 @@ export default function EnhancedGoalDetail() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.6, delay: 1.2 }}
             >
               <Card className="glass-card border-0">
                 <CardHeader>

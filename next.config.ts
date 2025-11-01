@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     ];
   },
   trailingSlash: false,
+  output: 'standalone', // Recommended for production with systemd
 };
 
 export default nextConfig;

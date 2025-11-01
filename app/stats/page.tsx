@@ -145,12 +145,16 @@ export default function Stats() {
   // Calculate average per day (approximate)
   const daysSinceStart = useMemo(() => {
     if (!goals.length) return 30;
-    const oldestGoal = goals.reduce((oldest, goal) => {
-      const goalDate = new Date(goal.timeframe.start);
-      const oldestDate = new Date(oldest.timeframe.start);
+    // Filter out goals without start dates
+    const goalsWithStart = goals.filter(goal => goal.timeframe.start);
+    if (!goalsWithStart.length) return 30;
+    
+    const oldestGoal = goalsWithStart.reduce((oldest, goal) => {
+      const goalDate = new Date(goal.timeframe.start!);
+      const oldestDate = new Date(oldest.timeframe.start!);
       return goalDate < oldestDate ? goal : oldest;
     });
-    const start = new Date(oldestGoal.timeframe.start);
+    const start = new Date(oldestGoal.timeframe.start!);
     const now = new Date();
     return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
   }, [goals]);

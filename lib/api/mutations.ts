@@ -290,7 +290,13 @@ export function useDeleteLogMutation(logId: number, goalId?: number) {
         queryClient.invalidateQueries({ queryKey: queryKeys.goalChart(goalId, '', '', '') });
       } else {
         // Fallback: invalidate all logs queries if goalId not provided
-        queryClient.invalidateQueries({ queryKey: queryKeys.goalLogs });
+        // Use predicate to match all goal logs queries
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey;
+            return Array.isArray(key) && key.length >= 3 && key[0] === 'goals' && key[2] === 'logs';
+          }
+        });
       }
       
       // Also invalidate general queries
