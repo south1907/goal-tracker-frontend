@@ -79,7 +79,12 @@ export function GoalWizard({ onComplete, onCancel }: GoalWizardProps) {
     open: ['items', 'tasks', 'goals'],
   };
   
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (currentStep === 0 && !formData.name.trim()) {
+      toast.error('Please enter a goal name');
+      return;
+    }
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -198,7 +203,6 @@ export function GoalWizard({ onComplete, onCancel }: GoalWizardProps) {
                     value={formData.name}
                     onChange={(e) => updateFormData({ name: e.target.value })}
                     placeholder="e.g., Read 20 Books in 2025"
-                    required
                   />
                 </div>
                 
@@ -392,9 +396,13 @@ export function GoalWizard({ onComplete, onCancel }: GoalWizardProps) {
             </Button>
             
             <Button
-              onClick={handleNext}
+              onClick={(e) => {
+                e.preventDefault();
+                handleNext(e);
+              }}
               disabled={currentStep === 0 && !formData.name.trim() || createGoalMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700 text-white"
+              type="button"
             >
               {createGoalMutation.isPending ? 'Creating...' : (currentStep === steps.length - 1 ? 'Create Goal' : 'Next')}
               {currentStep < steps.length - 1 && !createGoalMutation.isPending && <ArrowRight className="h-4 w-4 ml-2" />}
