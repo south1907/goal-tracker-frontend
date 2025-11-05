@@ -279,6 +279,24 @@ class ApiClient {
     return this.request<Goal>(`/goals/share/${shareToken}`, { method: 'GET' }, false);
   }
 
+  async getSharedGoalLogs(shareToken: string, page: number = 1, pageSize: number = 100): Promise<PaginatedResponse<Log>> {
+    // Public endpoint - no auth required
+    return this.request<PaginatedResponse<Log>>(
+      `/goals/share/${shareToken}/logs?page=${page}&page_size=${pageSize}`,
+      { method: 'GET' },
+      false
+    );
+  }
+
+  async getSharedGoalProgress(shareToken: string, window: string = 'all'): Promise<ProgressStats> {
+    // Public endpoint - no auth required
+    return this.request<ProgressStats>(
+      `/goals/share/${shareToken}/progress?window=${window}`,
+      { method: 'GET' },
+      false
+    );
+  }
+
   async generateShareToken(goalId: number): Promise<{ share_token: string }> {
     return this.post<{ share_token: string }>(`/goals/${goalId}/generate-share-token`);
   }

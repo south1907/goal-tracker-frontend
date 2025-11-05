@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
-import { Goal as ApiGoal, Log as ApiLog } from '@/lib/types/api';
+import { Goal as ApiGoal, Log as ApiLog, ProgressStats } from '@/lib/types/api';
 import { Goal as ComponentGoal, LogEntry as ComponentLogEntry } from '@/types/goal';
 import { apiClient } from '@/lib/api/client';
 import { EnhancedProgressRing } from '@/components/goal/enhanced-progress-ring';
@@ -77,6 +77,8 @@ export default function SharedGoalView() {
   const params = useParams();
   const router = useRouter();
   const [goal, setGoal] = useState<ApiGoal | null>(null);
+  const [logs, setLogs] = useState<ApiLog[]>([]);
+  const [progressData, setProgressData] = useState<ProgressStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,8 +96,18 @@ export default function SharedGoalView() {
     setLoading(true);
     setError(null);
     try {
-      const sharedGoal = await apiClient.getGoalByShareToken(shareToken);
+      // Load goal, logs, and progress in parallel
+      const [sharedGoal, logsResponse, progress] = await Promise.all([
+        apiClient.getGoalByShareToken(shareToken),
+        apiClient.getSharedGoalLogs(shareToken, 1, 100), // Get logs (max 100 per page)
+        apiClient.getSharedGoalProgress(shareToken, 'all'),
+      ]);
+      
       setGoal(sharedGoal);
+      // For display, we use the logs from the response
+      // Progress data already includes accurate calculations based on all logs
+      setLogs(logsResponse.items || []);
+      setProgressData(progress);
     } catch (err: any) {
       console.error('Error loading shared goal:', err);
       setError(err.detail || 'Failed to load shared goal');
@@ -159,8 +171,8 @@ export default function SharedGoalView() {
   }
 
   const componentGoal = adaptApiGoalToComponentGoal(goal);
-  // For shared goals, we don't have logs data, so we'll use empty array
-  const componentLogs: ComponentLogEntry[] = [];
+  // Convert API logs to component logs
+  const componentLogs: ComponentLogEntry[] = logs.map(adaptApiLogToComponentLogEntry);
 
   const GoalTypeIcon = getGoalTypeIcon(goal.goal_type);
 
@@ -216,7 +228,7 @@ export default function SharedGoalView() {
         >
           <GoalAnalytics
             goal={goal}
-            progressData={undefined}
+            progressData={progressData || undefined}
             logs={componentLogs}
           />
         </motion.div>
@@ -260,7 +272,7 @@ export default function SharedGoalView() {
                 <CardContent>
                   <EnhancedMilestoneChips
                     milestones={(goal.settings_json?.milestones as Array<{ label: string; threshold: number }>) || []}
-                    currentProgress={0}
+                    currentProgress={progressData?.progress_pct || 0}
                   />
                 </CardContent>
               </Card>
