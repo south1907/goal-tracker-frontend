@@ -12,6 +12,7 @@ import { EnhancedProgressRing } from '@/components/goal/enhanced-progress-ring';
 import { EnhancedMilestoneChips } from '@/components/goal/enhanced-milestone-chips';
 import { GoalAnalytics } from '@/components/goal/goal-analytics';
 import { EditGoalDialog } from '@/components/goal/edit-goal-dialog';
+import { ShareGoalDialog } from '@/components/goal/share-goal-dialog';
 import { LogQuickAdd } from '@/components/log/log-quick-add';
 import { LogList } from '@/components/log/log-list';
 import { EnhancedChartProgress } from '@/components/charts/enhanced-chart-progress';
@@ -24,6 +25,7 @@ import {
   ArrowLeft, 
   Edit, 
   Trash2, 
+  Share2,
   Plus, 
   TrendingUp, 
   TrendingDown,
@@ -87,6 +89,7 @@ export default function EnhancedGoalDetail() {
   const { isAuthenticated } = useAuthStore();
   const [isHydrated, setIsHydrated] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   
   // Parse goalId and validate - use useMemo to ensure it updates when params change
   const { goalId, isValidGoalId } = useMemo(() => {
@@ -342,6 +345,14 @@ export default function EnhancedGoalDetail() {
               <Button 
                 variant="outline" 
                 size="sm"
+                onClick={() => setIsShareDialogOpen(true)}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
                 onClick={() => setIsEditDialogOpen(true)}
               >
                 <Edit className="h-4 w-4 mr-2" />
@@ -557,6 +568,13 @@ export default function EnhancedGoalDetail() {
         goal={goal}
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
+      />
+      
+      {/* Share Goal Dialog */}
+      <ShareGoalDialog
+        goal={goal}
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
       />
     </div>
   );

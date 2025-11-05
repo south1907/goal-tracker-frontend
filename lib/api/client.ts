@@ -115,7 +115,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    requireAuth: boolean = true
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
@@ -138,8 +139,8 @@ class ApiClient {
       }
     }
 
-    // Add authorization header if we have an access token
-    if (this.accessToken) {
+    // Add authorization header if we have an access token and auth is required
+    if (requireAuth && this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
@@ -150,8 +151,8 @@ class ApiClient {
 
     let response = await fetch(url, requestOptions);
 
-    // Handle 401 Unauthorized - try to refresh token
-    if (response.status === 401 && this.refreshToken) {
+    // Handle 401 Unauthorized - try to refresh token (only if auth is required)
+    if (requireAuth && response.status === 401 && this.refreshToken) {
       const refreshed = await this.refreshAccessToken();
       if (refreshed) {
         // Retry the original request with new token
@@ -201,39 +202,39 @@ class ApiClient {
   }
 
   // HTTP method helpers
-  async get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' });
+  async get<T>(endpoint: string, requireAuth: boolean = true): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET' }, requireAuth);
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: any, requireAuth: boolean = true): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    }, requireAuth);
   }
 
-  async patch<T>(endpoint: string, data?: any): Promise<T> {
+  async patch<T>(endpoint: string, data?: any, requireAuth: boolean = true): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    }, requireAuth);
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
-    const result = await this.request<T>(endpoint, { method: 'DELETE' });
+  async delete<T>(endpoint: string, requireAuth: boolean = true): Promise<T> {
+    const result = await this.request<T>(endpoint, { method: 'DELETE' }, requireAuth);
     // For void return types (like deleteGoal), return undefined
     return result ?? (undefined as any);
   }
 
   // Auth methods
   async login(credentials: LoginRequest): Promise<AuthTokens> {
-    const tokens = await this.post<AuthTokens>('/auth/login', credentials);
+    const tokens = await this.post<AuthTokens>('/auth/login', credentials, false);
     this.saveTokens(tokens);
     return tokens;
   }
 
   async register(userData: RegisterRequest): Promise<User> {
-    return this.post<User>('/auth/register', userData);
+    return this.post<User>('/auth/register', userData, false);
   }
 
   async refresh(): Promise<AuthTokens> {
@@ -271,6 +272,15 @@ class ApiClient {
 
   async getGoal(goalId: number): Promise<Goal> {
     return this.get<Goal>(`/goals/${goalId}`);
+  }
+
+  async getGoalByShareToken(shareToken: string): Promise<Goal> {
+    // Public endpoint - no auth required
+    return this.request<Goal>(`/goals/share/${shareToken}`, { method: 'GET' }, false);
+  }
+
+  async generateShareToken(goalId: number): Promise<{ share_token: string }> {
+    return this.post<{ share_token: string }>(`/goals/${goalId}/generate-share-token`);
   }
 
   async createGoal(goal: GoalCreate): Promise<Goal> {

@@ -65,6 +65,7 @@ export interface Goal {
   privacy: PrivacyLevel;
   status: GoalStatus;
   settings_json?: GoalSettings;
+  share_token?: string;
   created_at: string;
   updated_at: string;
 }
