@@ -216,7 +216,7 @@ export default function SharedGoalView() {
         >
           <GoalAnalytics
             goal={goal}
-            progressData={null}
+            progressData={undefined}
             logs={componentLogs}
           />
         </motion.div>
@@ -259,8 +259,8 @@ export default function SharedGoalView() {
                 </CardHeader>
                 <CardContent>
                   <EnhancedMilestoneChips
-                    goal={componentGoal}
-                    logs={componentLogs}
+                    milestones={(goal.settings_json?.milestones as Array<{ label: string; threshold: number }>) || []}
+                    currentProgress={0}
                   />
                 </CardContent>
               </Card>
